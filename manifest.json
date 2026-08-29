@@ -1,7 +1,9 @@
 {
-  "name": "CimaNow Provider",
-  "description": "إضافة CimaNow لتطبيق Nuvio",
-  "manifestVersion": 1,
+  "id": "cimanow-repo",
+  "name": "CimaNow Repository",
+  "version": "1.0.0",
+  "description": "مستودع إضافة CimaNow لتطبيق Nuvio",
+  "author": "Abdelrahman",
   "providers": [
     {
       "id": "cimanow",
@@ -11,9 +13,10 @@
       "author": "Abdelrahman",
       "icon": "https://cimanow.cc/favicon.ico",
       "url": "https://raw.githubusercontent.com/Abdelrahman-EG/nuvio-cimanow/main/cimanow.js",
-      "source": "https://raw.githubusercontent.com/Abdelrahman-EG/nuvio-cimanow/main/cimanow.js",
       "types": ["movie", "tv"],
-      "status": "working"
+      "supportedTypes": ["movie", "tv"],
+      "status": "working",
+      "enabled": true
     }
   ]
 }
