@@ -1,0 +1,14 @@
+{
+  "steam_config_path": "E:\\Steam\\config\\stplug-in",
+  "depot_cache_path": "E:\\Steam\\config\\depotcache",
+  "steam_exe_path": "E:\\Steam\\steam.exe",
+  "steamtools_path": "E:\\Program Files\\SteamTools\\SteamTools.exe",
+  "theme": "dark",
+  "log_to_file": true,
+  "auto_updating_manifests": true,
+  "share_games_with_community": true,
+  "mirror_manifests_to_steam_depotcache": true,
+  "auth_key": "r6XXqgntNxFFCgyn",
+  "game_card_size": 75,
+  "setup_completed": true
+}
