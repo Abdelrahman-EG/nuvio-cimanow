@@ -1,16 +1,19 @@
 {
-  "name": "CimaNow Repository",
-  "description": "مستودع إضافات سيما ناو لتطبيق Nuvio",
+  "name": "CimaNow Provider",
+  "description": "إضافة CimaNow لتطبيق Nuvio",
   "manifestVersion": 1,
   "providers": [
     {
-      "id": "cimanow-provider",
+      "id": "cimanow",
       "name": "CimaNow",
       "version": "1.0.0",
-      "description": "مشاهدة الأفلام والمسلسلات العربية والأجنبية من CimaNow",
-      "filename": "cimanow.js",
-      "supportedTypes": ["movie", "tv"],
-      "enabled": true
+      "description": "مشاهدة وتحميل الأفلام والمسلسلات من سيما ناو",
+      "author": "Abdelrahman",
+      "icon": "https://cimanow.cc/favicon.ico",
+      "url": "https://raw.githubusercontent.com/Abdelrahman-EG/nuvio-cimanow/main/cimanow.js",
+      "source": "https://raw.githubusercontent.com/Abdelrahman-EG/nuvio-cimanow/main/cimanow.js",
+      "types": ["movie", "tv"],
+      "status": "working"
     }
   ]
 }
