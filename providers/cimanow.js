@@ -1,5 +1,5 @@
 /**
- * Nuvio Provider: CimaNow (with Full Logging & Deep Watch Resolution)
+ * Nuvio Provider: CimaNow (Full Direct Streams Extractor)
  */
 
 const BASE_URL = "https://cimanow.cc";
@@ -12,13 +12,8 @@ const HEADERS = {
   "Referer": BASE_URL
 };
 
-// طباعة موحدة للكونسول
-function log(step, message, data = "") {
-  console.log(`[CimaNow-Debug] [${step}] ${message}`, data ? JSON.stringify(data) : "");
-}
-
 // 1. جلب العناوين من TMDB
-async function getTmdbDetails(tmdbId, mediaType) {
+async function getTmdbInfo(tmdbId, mediaType) {
   try {
     const resAr = await fetch(`${TMDB_API}/${mediaType}/${tmdbId}?api_key=${TMDB_KEY}&language=ar`);
     const dataAr = await resAr.json();
@@ -26,193 +21,167 @@ async function getTmdbDetails(tmdbId, mediaType) {
     const resEn = await fetch(`${TMDB_API}/${mediaType}/${tmdbId}?api_key=${TMDB_KEY}&language=en-US`);
     const dataEn = await resEn.json();
 
-    const info = {
-      titleAr: dataAr.title || dataAr.name || "",
-      titleEn: dataEn.title || dataEn.name || "",
+    return {
+      titleAr: (dataAr.title || dataAr.name || "").replace(/[:\-–—_]/g, " ").trim(),
+      titleEn: (dataEn.title || dataEn.name || "").replace(/[:\-–—_]/g, " ").trim(),
       year: (dataAr.release_date || dataAr.first_air_date || dataEn.release_date || "").split("-")[0]
     };
-    log("TMDB", "بيانات العمل المستلمة:", info);
-    return info;
   } catch (e) {
-    log("TMDB", "فشل جلب بيانات TMDB", e.message);
     return null;
   }
 }
 
-// تنظيف الكلمات للبحث
-function cleanTitle(str) {
-  return str.replace(/[:\-–—_]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-// 2. محرك البحث داخل الموقع
-async function searchCimaNow(keyword) {
-  const query = cleanTitle(keyword);
-  const searchUrl = `${BASE_URL}/?s=${encodeURIComponent(query)}`;
-  log("Search", `جاري البحث عن: [${query}] الرابط: ${searchUrl}`);
-
+// 2. البحث عن رابط العمل داخل CimaNow
+async function searchCimaNow(query) {
+  if (!query) return [];
   try {
+    const searchUrl = `${BASE_URL}/?s=${encodeURIComponent(query)}`;
     const res = await fetch(searchUrl, { headers: HEADERS });
     const html = await res.text();
 
     const results = [];
-    const linkRegex = /<a[^>]+href="(https:\/\/cimanow\.cc\/[^"]+)"[^>]*title="([^"]+)"/gi;
+    const itemRegex = /<a[^>]+href="(https:\/\/cimanow\.cc\/[^"]+)"[^>]*title="([^"]+)"/gi;
     let match;
 
-    while ((match = linkRegex.exec(html)) !== null) {
+    while ((match = itemRegex.exec(html)) !== null) {
       const url = match[1];
       const title = match[2];
-      if (!url.includes("/category/") && !url.includes("/tag/") && !url.includes("/actors/")) {
+      if (!url.includes("/category/") && !url.includes("/tag/")) {
         results.push({ url, title });
       }
     }
-
-    log("Search", `عدد النتائج المعثور عليها: ${results.length}`);
     return results;
   } catch (e) {
-    log("Search", "خطأ أثناء محاولة البحث", e.message);
     return [];
   }
 }
 
-// 3. فحص واستخراج السيرفرات من صفحة المشاهدة
-async function extractServers(initialUrl) {
-  log("Scraper", `فتح الصفحة الأساسية: ${initialUrl}`);
+// 3. فك تشفير سيرفرات المشاهدة واستخراج الروابط المباشرة
+async function resolveDirectStreams(serverUrl, referer) {
   const streams = [];
-
   try {
-    const res = await fetch(initialUrl, { headers: HEADERS });
+    const res = await fetch(serverUrl, {
+      headers: {
+        "User-Agent": HEADERS["User-Agent"],
+        "Referer": referer || BASE_URL
+      }
+    });
+    const html = await res.text();
+
+    // استخراج روابط HLS المباشرة (.m3u8)
+    const m3u8Regex = /(https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*)/gi;
+    let m3u8Match;
+    while ((m3u8Match = m3u8Regex.exec(html)) !== null) {
+      streams.push({
+        name: "CimaNow HLS",
+        title: "جودة تلقائية (Auto HLS)",
+        url: m3u8Match[1],
+        quality: "Auto",
+        type: "m3u8",
+        headers: { "Referer": serverUrl, "User-Agent": HEADERS["User-Agent"] }
+      });
+    }
+
+    // استخراج روابط MP4 المباشرة
+    const mp4Regex = /(https?:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*)/gi;
+    let mp4Match;
+    while ((mp4Match = mp4Regex.exec(html)) !== null) {
+      streams.push({
+        name: "CimaNow Direct",
+        title: "سيرفر مباشر (MP4 HD)",
+        url: mp4Match[1],
+        quality: "1080p",
+        type: "mp4",
+        headers: { "Referer": serverUrl, "User-Agent": HEADERS["User-Agent"] }
+      });
+    }
+  } catch (err) {}
+  return streams;
+}
+
+// 4. استخراج كافة السيرفرات من صفحة الفيلم/الحلقة
+async function extractServers(postUrl) {
+  let streams = [];
+  try {
+    const res = await fetch(postUrl, { headers: HEADERS });
     let html = await res.text();
 
-    // البحث عن رابط صفحة المشاهدة المستقلة إن وجد
-    const watchLinkMatch = html.match(/href="([^"]+(?:\/watch\/|\?watch=|\/watching\/)[^"]*)"/i);
-    if (watchLinkMatch) {
-      let watchUrl = watchLinkMatch[1];
-      if (watchUrl.startsWith("//")) watchUrl = "https:" + watchUrl;
-      else if (watchUrl.startsWith("/")) watchUrl = BASE_URL + watchUrl;
-
-      log("Scraper", `تم العثور على صفحة مشاهدة فرعية، جاري الانتقال إليها: ${watchUrl}`);
+    // الانتقال لصفحة المشاهدة إن وجدت
+    const watchMatch = html.match(/href="([^"]*(?:\/watch\/|\?watch=)[^"]*)"/i);
+    let watchUrl = postUrl;
+    if (watchMatch) {
+      watchUrl = watchMatch[1].startsWith("http") ? watchMatch[1] : BASE_URL + watchMatch[1];
       const watchRes = await fetch(watchUrl, { headers: HEADERS });
       html = await watchRes.text();
     }
 
-    let serverIndex = 1;
+    // A. البحث عن روابط مباشرة بداخل الصفحة
+    const pageDirect = await resolveDirectStreams(watchUrl, postUrl);
+    streams.push(...pageDirect);
 
-    // A. استخراج وسوم iframes
+    // B. استخراج جميع سيرفرات الـ iframe وسيرفرات data-url
+    const serverLinks = [];
     const iframeRegex = /<iframe[^>]+src="([^"]+)"/gi;
-    let ifMatch;
-    while ((ifMatch = iframeRegex.exec(html)) !== null) {
-      let src = ifMatch[1];
-      if (src.startsWith("//")) src = "https:" + src;
-      if (!src.includes("facebook") && !src.includes("google") && !src.includes("ads") && !src.includes("histats")) {
-        streams.push({
-          name: "CimaNow",
-          title: `مشغل سيرفر #${serverIndex++}`,
-          url: src,
-          quality: "1080p",
-          headers: { "Referer": initialUrl, "User-Agent": HEADERS["User-Agent"] }
-        });
+    let ifm;
+    while ((ifm = iframeRegex.exec(html)) !== null) {
+      let src = ifm[1].startsWith("//") ? "https:" + ifm[1] : ifm[1];
+      if (!src.includes("google") && !src.includes("facebook") && !src.includes("ads")) {
+        serverLinks.push(src);
       }
     }
 
-    // B. استخراج السيرفرات من data-url أو data-embed
-    const dataRegex = /data-(?:url|embed|src|iframe)="([^"]+)"/gi;
-    let dataMatch;
-    while ((dataMatch = dataRegex.exec(html)) !== null) {
-      let src = dataMatch[1];
-      if (src.startsWith("//")) src = "https:" + src;
-      if (src.startsWith("http") && !src.includes("google") && !src.includes("ads")) {
-        streams.push({
-          name: "CimaNow",
-          title: `مشغل إضافي #${serverIndex++}`,
-          url: src,
-          quality: "720p",
-          headers: { "Referer": BASE_URL, "User-Agent": HEADERS["User-Agent"] }
-        });
+    const dataRegex = /data-(?:url|embed|src)="([^"]+)"/gi;
+    let dtm;
+    while ((dtm = dataRegex.exec(html)) !== null) {
+      let src = dtm[1].startsWith("//") ? "https:" + dtm[1] : dtm[1];
+      if (src.startsWith("http") && !src.includes("google")) {
+        serverLinks.push(src);
       }
     }
 
-    // C. استخراج روابط التشغيل المباشرة (.mp4 أو .m3u8)
-    const directRegex = /(https?:\/\/[^\s"'<>]+\.(?:m3u8|mp4)[^\s"'<>]*)/gi;
-    let dirMatch;
-    while ((dirMatch = directRegex.exec(html)) !== null) {
-      const link = dirMatch[1];
-      streams.push({
-        name: "CimaNow Direct",
-        title: link.includes(".m3u8") ? "HLS Auto Stream" : "Direct MP4 Video",
-        url: link,
-        quality: "Auto",
-        headers: { "Referer": BASE_URL, "User-Agent": HEADERS["User-Agent"] }
-      });
+    // فك تشفير السيرفرات المستخرجة بالتوازي
+    for (const sUrl of serverLinks) {
+      const resolved = await resolveDirectStreams(sUrl, watchUrl);
+      streams.push(...resolved);
     }
-
-    log("Scraper", `إجمالي السيرفرات المستخرجة بنجاح: ${streams.length}`);
-  } catch (err) {
-    log("Scraper", "خطأ أثناء استخراج السيرفرات", err.message);
-  }
+  } catch (e) {}
 
   return streams;
 }
 
-// 4. الدالة التنفيذية لتطبيق Nuvio
+// 5. الدالة الأساسية لتطبيق Nuvio
 async function getStreams(tmdbId, mediaType, season, episode) {
-  log("Init", `طلب جديد: TMDB ID: ${tmdbId}, Type: ${mediaType}, S: ${season}, E: ${episode}`);
-  
-  const meta = await getTmdbDetails(tmdbId, mediaType);
-  if (!meta) {
-    return [{ name: "CimaNow Info", title: "فشل الاتصال بـ TMDB", url: "" }];
+  try {
+    const meta = await getTmdbInfo(tmdbId, mediaType);
+    if (!meta) return [];
+
+    let results = [];
+    if (meta.titleAr) results = await searchCimaNow(meta.titleAr);
+    if (results.length === 0 && meta.titleEn) results = await searchCimaNow(meta.titleEn);
+
+    if (results.length === 0) return [];
+
+    let targetUrl = null;
+    if (mediaType === "movie") {
+      const match = results.find(r => r.title.includes(meta.year) || r.title.includes(meta.titleAr));
+      targetUrl = match ? match.url : results[0].url;
+    } else {
+      const s = String(season || 1);
+      const ep = String(episode || 1);
+      const epMatch = results.find(r =>
+        (r.title.includes(`الموسم ${s}`) || r.title.includes(`موسم ${s}`)) &&
+        (r.title.includes(`الحلقة ${ep}`) || r.title.includes(`حلقة ${ep}`))
+      );
+      targetUrl = epMatch ? epMatch.url : results[0].url;
+    }
+
+    if (!targetUrl) return [];
+
+    // إرجاع الروابط المباشرة الصالحة فقط للتشغيل
+    return await extractServers(targetUrl);
+  } catch (error) {
+    return [];
   }
-
-  let results = [];
-
-  // البحث بالاسم العربي أولاً
-  if (meta.titleAr) {
-    results = await searchCimaNow(meta.titleAr);
-  }
-
-  // إذا لم نجد نتائج، نجرب بالاسم الإنجليزي
-  if (results.length === 0 && meta.titleEn) {
-    results = await searchCimaNow(meta.titleEn);
-  }
-
-  if (results.length === 0) {
-    log("Finish", "لم يتم العثور على أي نتائج في CimaNow");
-    return [{
-      name: "CimaNow Info",
-      title: `لا توجد نتائج لـ: ${meta.titleAr || meta.titleEn}`,
-      url: ""
-    }];
-  }
-
-  let targetUrl = null;
-
-  if (mediaType === "movie") {
-    // مطابقة الفيلم بالسنة أو أخذ النتيجة الأكثر ملاءمة
-    const match = results.find(r => r.title.includes(meta.year) || r.title.includes(meta.titleAr));
-    targetUrl = match ? match.url : results[0].url;
-  } else {
-    // مطابقة المسلسلات بالموسم والحلقة
-    const s = String(season || 1);
-    const ep = String(episode || 1);
-    const epMatch = results.find(r =>
-      (r.title.includes(`الموسم ${s}`) || r.title.includes(`موسم ${s}`)) &&
-      (r.title.includes(`الحلقة ${ep}`) || r.title.includes(`حلقة ${ep}`))
-    );
-    targetUrl = epMatch ? epMatch.url : results[0].url;
-  }
-
-  log("Resolver", `تم اختيار الرابط النهائي: ${targetUrl}`);
-
-  const finalStreams = await extractServers(targetUrl);
-
-  if (finalStreams.length === 0) {
-    return [{
-      name: "CimaNow Info",
-      title: `تم فتح الصفحة لكن لم يتم العثور على مشغلات صالحة`,
-      url: ""
-    }];
-  }
-
-  return finalStreams;
 }
 
 module.exports = { getStreams };
