@@ -1,0 +1,12 @@
+{
+  "id": "com.nuvio.cimanow",
+  "name": "CimaNow (سيما ناو)",
+  "version": "1.0.0",
+  "description": "مشاهدة وتحميل الأفلام والمسلسلات العربية والأجنبية من CimaNow",
+  "author": "Custom Developer",
+  "icon": "https://cimanow.cc/favicon.ico",
+  "filename": "cimanow.js",
+  "supportedTypes": ["movie", "tv"],
+  "languages": ["ar", "en"],
+  "enabled": true
+}
