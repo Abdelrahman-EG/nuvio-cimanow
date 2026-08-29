@@ -1,22 +1,27 @@
 {
-  "id": "cimanow-repo",
-  "name": "CimaNow Repository",
+  "name": "CimaNow Repo",
   "version": "1.0.0",
-  "description": "مستودع إضافة CimaNow لتطبيق Nuvio",
-  "author": "Abdelrahman",
-  "providers": [
+  "scrapers": [
     {
       "id": "cimanow",
       "name": "CimaNow",
+      "description": "Arabic streaming provider for movies and TV series from CimaNow",
       "version": "1.0.0",
-      "description": "مشاهدة وتحميل الأفلام والمسلسلات من سيما ناو",
       "author": "Abdelrahman",
-      "icon": "https://cimanow.cc/favicon.ico",
-      "url": "https://raw.githubusercontent.com/Abdelrahman-EG/nuvio-cimanow/main/cimanow.js",
-      "types": ["movie", "tv"],
-      "supportedTypes": ["movie", "tv"],
-      "status": "working",
-      "enabled": true
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/cimanow.js",
+      "enabled": true,
+      "formats": [
+        "mp4",
+        "m3u8"
+      ],
+      "logo": "https://www.google.com/s2/favicons?domain=cimanow.cc&sz=128",
+      "contentLanguage": [
+        "ar"
+      ]
     }
   ]
 }
