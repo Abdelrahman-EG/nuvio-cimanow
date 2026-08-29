@@ -1,12 +1,16 @@
 {
-  "id": "com.nuvio.cimanow",
-  "name": "CimaNow (سيما ناو)",
-  "version": "1.0.0",
-  "description": "مشاهدة وتحميل الأفلام والمسلسلات العربية والأجنبية من CimaNow",
-  "author": "Custom Developer",
-  "icon": "https://cimanow.cc/favicon.ico",
-  "filename": "cimanow.js",
-  "supportedTypes": ["movie", "tv"],
-  "languages": ["ar", "en"],
-  "enabled": true
+  "name": "CimaNow Repository",
+  "description": "مستودع إضافات سيما ناو لتطبيق Nuvio",
+  "manifestVersion": 1,
+  "providers": [
+    {
+      "id": "cimanow-provider",
+      "name": "CimaNow",
+      "version": "1.0.0",
+      "description": "مشاهدة الأفلام والمسلسلات العربية والأجنبية من CimaNow",
+      "filename": "cimanow.js",
+      "supportedTypes": ["movie", "tv"],
+      "enabled": true
+    }
+  ]
 }
